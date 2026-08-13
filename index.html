@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monitoring VLL/LHR Per Golongan (Cloud Connected)</title>
+  <title>Monitoring VLL/LHR Per Golongan (Realtime Cloud)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Library SheetJS untuk Ekspor Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -14,7 +14,7 @@
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 gap-4">
       <div>
         <h2 class="text-2xl font-bold text-slate-800">Monitoring VLL/LHR Per Golongan</h2>
-        <p class="text-xs text-slate-500 mt-1">Sistem Input, Edit, Rekap, dan Monitoring Data VLL/LHR (Tersimpan Online di Firebase)</p>
+        <p class="text-xs text-slate-500 mt-1">Sistem Input, Edit, Rekap (Koneksi Live Realtime Database)</p>
       </div>
       <div class="flex gap-2">
         <button onclick="eksporExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition-colors flex items-center gap-1 shadow">
@@ -75,14 +75,14 @@
         </div>
 
         <button type="submit" id="btnSubmit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 text-sm rounded-lg transition-colors shadow">
-          Simpan Data VLL/LHR ke Cloud
+          Simpan Data VLL/LHR Ke Cloud
         </button>
       </form>
     </div>
 
     <!-- Tabel Daftar Rekap Data Terinput -->
     <div>
-      <h3 class="text-lg font-semibold text-slate-700 mb-3">Rekap VLL/LHR Per Periode (Cloud Data)</h3>
+      <h3 class="text-lg font-semibold text-slate-700 mb-3">Rekap VLL/LHR Per Periode (Live Realtime)</h3>
       <div class="overflow-x-auto border border-slate-200 rounded-lg">
         <table id="tabelData" class="w-full text-left border-collapse text-xs sm:text-sm">
           <thead class="bg-slate-800 text-white font-medium">
@@ -109,10 +109,10 @@
             </tr>
           </thead>
           <tbody id="tbodyRiwayat" class="divide-y divide-slate-200 bg-white">
-            <!-- Data diisi otomatis dari Firebase -->
+            <!-- Data diisi otomatis oleh JS -->
           </tbody>
           <tfoot id="tfootRiwayat" class="bg-slate-200 text-slate-800 font-bold border-t-2 border-slate-400">
-            <!-- Total diisi otomatis -->
+            <!-- Total diisi otomatis oleh JS -->
           </tfoot>
         </table>
       </div>
@@ -142,54 +142,51 @@
 
   </div>
 
-  <!-- FIREBASE MODULE SCRIPT -->
+  <!-- SCRIPT FIREBASE REALTIME DATABASE -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { 
-      getFirestore, 
-      collection, 
-      addDoc, 
-      getDocs, 
-      doc, 
-      updateDoc, 
-      deleteDoc 
-    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+      getDatabase, 
+      ref, 
+      push, 
+      set, 
+      onValue, 
+      remove 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // PASTE KODE FIREBASE CONFIG ANDA DI SINI
+    // Ganti dengan Config Firebase Milikmu dari Project Settings
     const firebaseConfig = {
-      apiKey: "PASTE_API_KEY_ANDA_DI_SINI",
-      authDomain: "PASTE_PROJECT_ID.firebaseapp.com",
-      projectId: "PASTE_PROJECT_ID",
-      storageBucket: "PASTE_PROJECT_ID.appspot.com",
-      messagingSenderId: "PASTE_SENDER_ID",
-      appId: "PASTE_APP_ID"
+      apiKey: "AIzaSyCoWNaVJ12HCpq3pTtYJayuiBQHjczX6Tw",
+      authDomain: "m-e-ops-3.firebaseapp.com",
+      databaseURL: "https://m-e-ops-3-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "m-e-ops-3",
+      storageBucket: "m-e-ops-3.firebasestorage.app",
+      messagingSenderId: "973955801066",
+      appId: "1:973955801066:web:f2726d1f8623efdd5e5c93"
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const lhrCollection = collection(db, "dataLHR");
+    const db = getDatabase(app);
+    const lhrRef = ref(db, 'dataLHR');
 
     let dataLHR = [];
 
-    // Load Data dari Firestore Cloud
-    async function loadDataFromCloud() {
-      try {
-        const querySnapshot = await getDocs(lhrCollection);
-        dataLHR = [];
-        querySnapshot.forEach((docSnap) => {
+    // Listener Realtime (Mendengar Perubahan Data Secara Otomatis)
+    onValue(lhrRef, (snapshot) => {
+      dataLHR = [];
+      const val = snapshot.val();
+      if (val) {
+        Object.keys(val).forEach((key) => {
           dataLHR.push({
-            docId: docSnap.id,
-            ...docSnap.data()
+            dbKey: key,
+            ...val[key]
           });
         });
-        render();
-      } catch (error) {
-        console.error("Gagal mengambil data dari cloud:", error);
-        alert("Gagal memuat data dari database cloud. Pastikan Firebase Config dan Rules sudah benar.");
       }
-    }
+      render();
+    });
 
-    // Simpan / Update Data
+    // Simpan / Edit Data
     window.simpanData = async function(e) {
       e.preventDefault();
       const editId = document.getElementById('editId').value;
@@ -205,41 +202,41 @@
 
       try {
         if (editId) {
-          const docRef = doc(db, "dataLHR", editId);
-          await updateDoc(docRef, payload);
+          // Mode Update Data
+          await set(ref(db, `dataLHR/${editId}`), payload);
         } else {
-          await addDoc(lhrCollection, payload);
+          // Mode Tambah Data
+          const newRef = push(lhrRef);
+          await set(newRef, payload);
         }
         window.batalEdit();
-        await loadDataFromCloud();
-      } catch (error) {
-        console.error("Gagal menyimpan data:", error);
-        alert("Terjadi kesalahan saat menyimpan data ke cloud.");
+      } catch (err) {
+        console.error("Gagal simpan:", err);
+        alert("Gagal menyimpan data ke database online.");
       }
     };
 
     // Hapus Data
-    window.hapusData = async function(docId) {
-      if (confirm('Yakin ingin menghapus data LHR periode ini dari database cloud?')) {
+    window.hapusData = async function(dbKey) {
+      if (confirm('Yakin ingin menghapus data ini dari Realtime Cloud Database?')) {
         try {
-          await deleteDoc(doc(db, "dataLHR", docId));
+          await remove(ref(db, `dataLHR/${dbKey}`));
           window.batalEdit();
-          await loadDataFromCloud();
-        } catch (error) {
-          console.error("Gagal menghapus data:", error);
-          alert("Gagal menghapus data dari cloud!");
+        } catch (err) {
+          console.error("Gagal hapus:", err);
+          alert("Gagal menghapus data!");
         }
       }
     };
 
-    // Render Tabel
+    // Render Tampilan Tabel
     function render() {
       const tbodyRiwayat = document.getElementById('tbodyRiwayat');
       const tfootRiwayat = document.getElementById('tfootRiwayat');
       tbodyRiwayat.innerHTML = '';
 
       if (dataLHR.length === 0) {
-        tbodyRiwayat.innerHTML = `<tr><td colspan="15" class="p-4 text-center text-slate-400">Belum ada data tersimpan di cloud database.</td></tr>`;
+        tbodyRiwayat.innerHTML = `<tr><td colspan="15" class="p-4 text-center text-slate-400">Belum ada data di Realtime Database.</td></tr>`;
         tfootRiwayat.innerHTML = '';
         renderStatistik(0, 0, 0, 0, 0, 0);
         return;
@@ -280,15 +277,15 @@
             <td class="py-2.5 text-right font-extrabold text-red-800 font-mono">${pctg4}%</td>
             <td class="py-2.5 text-right font-extrabold text-red-800 font-mono">${pctg5}%</td>
             <td class="p-3 text-center space-x-1">
-              <button onclick="editData('${item.docId}')" class="text-amber-600 hover:text-amber-800 font-medium px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 transition-colors">Edit</button>
-              <button onclick="hapusData('${item.docId}')" class="text-rose-600 hover:text-rose-800 font-medium px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 transition-colors">Hapus</button>
+              <button onclick="editData('${item.dbKey}')" class="text-amber-600 hover:text-amber-800 font-medium px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 transition-colors">Edit</button>
+              <button onclick="hapusData('${item.dbKey}')" class="text-rose-600 hover:text-rose-800 font-medium px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 transition-colors">Hapus</button>
             </td>
           </tr>
         `;
       });
 
       const grandTotalLHR = totalGlobalGol1 + totalGlobalGol2 + totalGlobalGol3 + totalGlobalGol4 + totalGlobalGol5;
-      const avgGlobalLHR = totalGlobalHari > 0 ? Math.round(grandTotalLHR / totalGlobalHari) : 0;
+      const avgLHR = totalGlobalHari > 0 ? Math.round(grandTotalLHR / totalGlobalHari) : 0;
 
       tfootRiwayat.innerHTML = `
         <tr>
@@ -300,7 +297,7 @@
           <td class="p-3 text-right">${totalGlobalGol4.toLocaleString('id-ID')}</td>
           <td class="p-3 text-right">${totalGlobalGol5.toLocaleString('id-ID')}</td>
           <td class="p-3 text-right text-blue-700">${grandTotalLHR.toLocaleString('id-ID')}</td>
-          <td class="p-3 text-right text-blue-700">${avgGlobalLHR.toLocaleString('id-ID')}</td>
+          <td class="p-3 text-right text-blue-700">${avgLHR.toLocaleString('id-ID')}</td>
           <td colspan="6" class="p-3 text-center">-</td>
         </tr>
       `;
@@ -308,7 +305,6 @@
       renderStatistik(totalGlobalGol1, totalGlobalGol2, totalGlobalGol3, totalGlobalGol4, totalGlobalGol5, totalGlobalHari);
     }
 
-    // Render Statistik
     function renderStatistik(g1, g2, g3, g4, g5, totalHari) {
       const totalGlobalAll = g1 + g2 + g3 + g4 + g5;
       const golArr = [
@@ -344,17 +340,17 @@
           <td class="pt-3">Total Seluruh Golongan</td>
           <td class="pt-3 text-center font-mono">${totalGlobalAll.toLocaleString('id-ID')} Kr</td>
           <td class="pt-3 text-center font-mono text-slate-400">${totalAvgGlobal.toLocaleString('id-ID')} Kr</td>
-          <td class="pt-3 text-center text-emerald-400 font-mono">100.00%</td>
+          <td class="pt-3 text-center text-emerald-400 font-mono">0.00%</td>
         </tr>
       `;
     }
 
-    // Form Helper Functions
-    window.editData = function(docId) {
-      const item = dataLHR.find(d => d.docId === docId);
+    // Controls/Form Helpers
+    window.editData = function(dbKey) {
+      const item = dataLHR.find(d => d.dbKey === dbKey);
       if (!item) return;
 
-      document.getElementById('editId').value = item.docId;
+      document.getElementById('editId').value = item.dbKey;
       document.getElementById('inputPeriode').value = item.periode;
       document.getElementById('inputHari').value = item.hari;
       document.getElementById('inputGol1').value = item.gol1;
@@ -364,7 +360,7 @@
       document.getElementById('inputGol5').value = item.gol5;
 
       document.getElementById('formTitle').innerHTML = '<span>✏️</span> Edit Data VLL/LHR Periode';
-      document.getElementById('btnSubmit').innerText = 'Update Data VLL/LHR di Cloud';
+      document.getElementById('btnSubmit').innerText = 'Update Data VLL/LHR di Realtime Database';
       document.getElementById('btnSubmit').className = 'w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 text-sm rounded-lg transition-colors shadow';
       document.getElementById('btnBatalEdit').classList.remove('hidden');
 
@@ -380,8 +376,8 @@
       document.getElementById('inputGol4').value = 0;
       document.getElementById('inputGol5').value = 0;
 
-      document.getElementById('formTitle').innerHTML = '<span>➕</span> Tambah Entry Data VLL/LHR';
-      document.getElementById('btnSubmit').innerText = 'Simpan Data VLL/LHR ke Cloud';
+      document.getElementById('formTitle').innerHTML = '<span>➕</span> Entry Data VLL/LHR';
+      document.getElementById('btnSubmit').innerText = 'Simpan Data VLL/LHR Ke Cloud';
       document.getElementById('btnSubmit').className = 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 text-sm rounded-lg transition-colors shadow';
       document.getElementById('btnBatalEdit').classList.add('hidden');
     };
@@ -393,7 +389,6 @@
       return `${namaBulan[parseInt(month) - 1]} ${year}`;
     }
 
-    // Ekspor Excel
     window.eksporExcel = function() {
       if (dataLHR.length === 0) {
         alert("Tidak ada data untuk diekspor!");
@@ -415,11 +410,9 @@
         };
       });
       const ws = XLSX.utils.json_to_sheet(excelData);
-      XLSX.utils.book_append_sheet(wb, ws, "Rekap LHR Cloud");
+      XLSX.utils.book_append_sheet(wb, ws, "Rekap Realtime LHR");
       XLSX.writeFile(wb, "Monitoring_LHR_Per_Golongan.xlsx");
     };
-
-    loadDataFromCloud();
   </script>
 </body>
 </html>
