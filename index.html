@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitoring VLL/LHR Per Golongan (Cloud Connected)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Library SheetJS untuk Ekspor Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-100 min-h-screen p-4 sm:p-6 font-sans">
+
+  <div class="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-md space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 gap-4">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-800">Monitoring VLL/LHR Per Golongan</h2>
+        <p class="text-xs text-slate-500 mt-1">Sistem Input, Edit, Rekap, dan Monitoring Data VLL/LHR (Tersimpan Online di Firebase)</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="eksporExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition-colors flex items-center gap-1 shadow">
+          📊 Ekspor Excel
+        </button>
+        <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition-colors flex items-center gap-1 shadow">
+          🖨️ Cetak / PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Form Input / Edit Data -->
+    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+      <div class="flex justify-between items-center mb-3">
+        <h3 id="formTitle" class="text-md font-semibold text-slate-700 flex items-center gap-2">
+          <span>➕</span> Entry Data VLL/LHR
+        </h3>
+        <button id="btnBatalEdit" onclick="batalEdit()" class="hidden text-xs text-rose-600 underline font-semibold">Batal Edit</button>
+      </div>
+      
+      <form id="lhrForm" onsubmit="simpanData(event)" class="space-y-4">
+        <input type="hidden" id="editId" value="">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Periode (Bulan/Tahun)</label>
+            <input type="month" id="inputPeriode" required class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Jumlah Hari</label>
+            <input type="number" id="inputHari" min="1" placeholder="Contoh: 30" required class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-2">Jumlah VLL/LHR Berdasarkan Golongan</label>
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div>
+              <span class="text-xs text-slate-500 block mb-1">Golongan I</span>
+              <input type="number" id="inputGol1" min="0" value="0" required class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 block mb-1">Golongan II</span>
+              <input type="number" id="inputGol2" min="0" value="0" required class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 block mb-1">Golongan III</span>
+              <input type="number" id="inputGol3" min="0" value="0" required class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 block mb-1">Golongan IV</span>
+              <input type="number" id="inputGol4" min="0" value="0" required class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 block mb-1">Golongan V</span>
+              <input type="number" id="inputGol5" min="0" value="0" required class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="btnSubmit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 text-sm rounded-lg transition-colors shadow">
+          Simpan Data VLL/LHR ke Cloud
+        </button>
+      </form>
+    </div>
+
+    <!-- Tabel Daftar Rekap Data Terinput -->
+    <div>
+      <h3 class="text-lg font-semibold text-slate-700 mb-3">Rekap VLL/LHR Per Periode (Cloud Data)</h3>
+      <div class="overflow-x-auto border border-slate-200 rounded-lg">
+        <table id="tabelData" class="w-full text-left border-collapse text-xs sm:text-sm">
+          <thead class="bg-slate-800 text-white font-medium">
+            <tr>
+              <th rowspan="2" class="p-3">Periode</th>
+              <th rowspan="2" class="p-3 text-center">Hari</th>
+              <th colspan="5" class="p-3 text-center">Golongan</th>
+              <th rowspan="2" class="p-3 text-center">VLL</th>
+              <th rowspan="2" class="p-3 text-center">LHR</th>
+              <th colspan="5" class="p-3 text-center">Proporsi %</th>
+              <th rowspan="2" class="p-3 text-center">Aksi</th>
+            </tr>
+            <tr>
+              <th class="p-3 text-center">I</th>
+              <th class="p-3 text-center">II</th>
+              <th class="p-3 text-center">III</th>
+              <th class="p-3 text-center">IV</th>
+              <th class="p-3 text-center">V</th>
+              <th class="p-3 text-center">I</th>
+              <th class="p-3 text-center">II</th>
+              <th class="p-3 text-center">III</th>
+              <th class="p-3 text-center">IV</th>
+              <th class="p-3 text-center">V</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyRiwayat" class="divide-y divide-slate-200 bg-white">
+            <!-- Data dari Cloud diisi otomatis oleh JS -->
+          </tbody>
+          <tfoot id="tfootRiwayat" class="bg-slate-200 text-slate-800 font-bold border-t-2 border-slate-400">
+            <!-- Total diisi otomatis oleh JS -->
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Detail Analisis Golongan -->
+    <div class="bg-slate-900 text-white p-5 rounded-xl space-y-4">
+      <h3 class="text-md font-bold text-blue-400 border-b border-slate-700 pb-2">📊 Analisis Distribusi Golongan (Kumulatif All Periode)</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs sm:text-sm">
+          <thead>
+            <tr class="text-slate-400 border-b border-slate-700">
+              <th class="pb-2">Golongan</th>
+              <th class="pb-2 text-center">VLL Total</th>
+              <th class="pb-2 text-center">LHR Total</th>
+              <th class="pb-2 text-center">Proporsi</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyStatistik" class="divide-y divide-slate-800 text-slate-200">
+            <!-- Data statistik diisi otomatis oleh JS -->
+          </tbody>
+          <tfoot id="tfootStatistik" class="border-t border-slate-700 font-bold text-white">
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FIREBASE MODULE SCRIPT -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      getDocs, 
+      doc, 
+      updateDoc, 
+      deleteDoc 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // KONEKSI FIREBASE (Ganti nilai berikut dengan Kunci API Firebase Anda)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCWr4wsORe_eKWt-4AEnnHai9F-JzjMc7U",
+      authDomain: "m-e-ops.firebaseapp.com",
+      databaseURL: "https://m-e-ops-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "m-e-ops",
+      storageBucket: "m-e-ops.firebasestorage.app",
+      messagingSenderId: "775606736462",
+      appId: "1:775606736462:web:9165314ab2a5f182d9151f"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const lhrCollection = collection(db, "dataLHR");
+
+    let dataLHR = [];
+
+    // 1. Ambil Data dari Firebase Firestore
+    async function loadDataFromCloud() {
+      try {
+        const querySnapshot = await getDocs(lhrCollection);
+        dataLHR = [];
+        querySnapshot.forEach((docSnap) => {
+          dataLHR.push({
+            docId: docSnap.id,
+            ...docSnap.data()
+          });
+        });
+        render();
+      } catch (error) {
+        console.error("Gagal mengambil data dari cloud:", error);
+        alert("Gagal memuat data dari database cloud!");
+      }
+    }
+
+    // 2. Simpan / Edit Data ke Firebase Firestore
+    window.simpanData = async function(e) {
+      e.preventDefault();
+      const editId = document.getElementById('editId').value;
+      const periode = document.getElementById('inputPeriode').value;
+      const hari = parseInt(document.getElementById('inputHari').value) || 0;
+      const gol1 = parseInt(document.getElementById('inputGol1').value) || 0;
+      const gol2 = parseInt(document.getElementById('inputGol2').value) || 0;
+      const gol3 = parseInt(document.getElementById('inputGol3').value) || 0;
+      const gol4 = parseInt(document.getElementById('inputGol4').value) || 0;
+      const gol5 = parseInt(document.getElementById('inputGol5').value) || 0;
+
+      const payload = { periode, hari, gol1, gol2, gol3, gol4, gol5 };
+
+      try {
+        if (editId) {
+          const docRef = doc(db, "dataLHR", editId);
+          await updateDoc(docRef, payload);
+        } else {
+          await addDoc(lhrCollection, payload);
+        }
+        batalEdit();
+        await loadDataFromCloud();
+      } catch (error) {
+        console.error("Gagal menyimpan data:", error);
+        alert("Terjadi kesalahan saat menyimpan data ke cloud.");
+      }
+    };
+
+    // 3. Hapus Data dari Firebase Firestore
+    window.hapusData = async function(docId) {
+      if (confirm('Yakin ingin menghapus data LHR periode ini dari database cloud?')) {
+        try {
+          await deleteDoc(doc(db, "dataLHR", docId));
+          batalEdit();
+          await loadDataFromCloud();
+        } catch (error) {
+          console.error("Gagal menghapus data:", error);
+          alert("Gagal menghapus data dari cloud!");
+        }
+      }
+    };
+
+    // 4. Render Tabel Utama
+    function render() {
+      const tbodyRiwayat = document.getElementById('tbodyRiwayat');
+      const tfootRiwayat = document.getElementById('tfootRiwayat');
+      tbodyRiwayat.innerHTML = '';
+
+      if (dataLHR.length === 0) {
+        tbodyRiwayat.innerHTML = `<tr><td colspan="15" class="p-4 text-center text-slate-400">Belum ada data tersimpan di online database.</td></tr>`;
+        tfootRiwayat.innerHTML = '';
+        renderStatistik(0, 0, 0, 0, 0, 0);
+        return;
+      }
+
+      let totalGlobalGol1 = 0, totalGlobalGol2 = 0, totalGlobalGol3 = 0, totalGlobalGol4 = 0, totalGlobalGol5 = 0, totalGlobalHari = 0;
+
+      dataLHR.forEach((item) => {
+        const total = item.gol1 + item.gol2 + item.gol3 + item.gol4 + item.gol5;
+        const lhr = Math.round(total / item.hari);
+        const pctg1 = total > 0 ? ((item.gol1 / total) * 100).toFixed(2) : '0.00';
+        const pctg2 = total > 0 ? ((item.gol2 / total) * 100).toFixed(2) : '0.00';
+        const pctg3 = total > 0 ? ((item.gol3 / total) * 100).toFixed(2) : '0.00';
+        const pctg4 = total > 0 ? ((item.gol4 / total) * 100).toFixed(2) : '0.00';
+        const pctg5 = total > 0 ? ((item.gol5 / total) * 100).toFixed(2) : '0.00';
+        
+        totalGlobalGol1 += item.gol1;
+        totalGlobalGol2 += item.gol2;
+        totalGlobalGol3 += item.gol3;
+        totalGlobalGol4 += item.gol4;
+        totalGlobalGol5 += item.gol5;
+        totalGlobalHari += item.hari;
+
+        tbodyRiwayat.innerHTML += `
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="p-3 font-semibold text-slate-700">${formatPeriode(item.periode)}</td>
+            <td class="p-3 text-center">${item.hari} hari</td>
+            <td class="p-3 text-right">${item.gol1.toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">${item.gol2.toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">${item.gol3.toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">${item.gol4.toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">${item.gol5.toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right font-bold text-blue-600">${total.toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right font-bold text-blue-600">${lhr.toLocaleString('id-ID')}</td>
+            <td class="py-2.5 text-right font-extrabold text-red-800 font-mono">${pctg1}%</td>
+            <td class="py-2.5 text-right font-extrabold text-red-800 font-mono">${pctg2}%</td>
+            <td class="py-2.5 text-right font-extrabold text-red-800 font-mono">${pctg3}%</td>
+            <td class="py-2.5 text-right font-extrabold text-red-800 font-mono">${pctg4}%</td>
+            <td class="py-2.5 text-right font-extrabold text-red-800 font-mono">${pctg5}%</td>
+            <td class="p-3 text-center space-x-1">
+              <button onclick="editData('${item.docId}')" class="text-amber-600 hover:text-amber-800 font-medium px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 transition-colors">Edit</button>
+              <button onclick="hapusData('${item.docId}')" class="text-rose-600 hover:text-rose-800 font-medium px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 transition-colors">Hapus</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      const grandTotalLHR = totalGlobalGol1 + totalGlobalGol2 + totalGlobalGol3 + totalGlobalGol4 + totalGlobalGol5;
+      const avgGlobalLHR = totalGlobalHari > 0 ? Math.round(grandTotalLHR / totalGlobalHari) : 0;
+
+      tfootRiwayat.innerHTML = `
+        <tr>
+          <td class="p-3">TOTAL</td>
+          <td class="p-3 text-center">${totalGlobalHari} hari</td>
+          <td class="p-3 text-right">${totalGlobalGol1.toLocaleString('id-ID')}</td>
+          <td class="p-3 text-right">${totalGlobalGol2.toLocaleString('id-ID')}</td>
+          <td class="p-3 text-right">${totalGlobalGol3.toLocaleString('id-ID')}</td>
+          <td class="p-3 text-right">${totalGlobalGol4.toLocaleString('id-ID')}</td>
+          <td class="p-3 text-right">${totalGlobalGol5.toLocaleString('id-ID')}</td>
+          <td class="p-3 text-right text-blue-700">${grandTotalLHR.toLocaleString('id-ID')}</td>
+          <td class="p-3 text-right text-blue-700">${avgGlobalLHR.toLocaleString('id-ID')}</td>
+          <td colspan="6" class="p-3 text-center">-</td>
+        </tr>
+      `;
+
+      renderStatistik(totalGlobalGol1, totalGlobalGol2, totalGlobalGol3, totalGlobalGol4, totalGlobalGol5, totalGlobalHari);
+    }
+
+    // 5. Render Tabel Statistik Kumulatif
+    function renderStatistik(g1, g2, g3, g4, g5, totalHari) {
+      const totalGlobalAll = g1 + g2 + g3 + g4 + g5;
+      const golArr = [
+        { nama: 'Golongan I', total: g1 },
+        { nama: 'Golongan II', total: g2 },
+        { nama: 'Golongan III', total: g3 },
+        { nama: 'Golongan IV', total: g4 },
+        { nama: 'Golongan V', total: g5 },
+      ];
+
+      const tbodyStat = document.getElementById('tbodyStatistik');
+      tbodyStat.innerHTML = '';
+
+      golArr.forEach(g => {
+        const pct = totalGlobalAll > 0 ? ((g.total / totalGlobalAll) * 100).toFixed(2) : '0.00';
+        const avg = totalHari > 0 ? Math.round(g.total / totalHari) : '0';
+
+        tbodyStat.innerHTML += `
+          <tr>
+            <td class="py-2.5">${g.nama}</td>
+            <td class="py-2.5 text-center font-mono">${g.total.toLocaleString('id-ID')} Kr</td>
+            <td class="py-2.5 text-center font-mono text-slate-400">${avg.toLocaleString('id-ID')} Kr</td>
+            <td class="py-2.5 text-center font-bold text-emerald-400 font-mono">${pct}%</td>
+          </tr>
+        `;
+      });
+
+      const tfootStat = document.getElementById('tfootStatistik');
+      const totalAvgGlobal = totalHari > 0 ? Math.round(totalGlobalAll / totalHari) : '0';
+      
+      tfootStat.innerHTML = `
+        <tr class="pt-2 border-t border-slate-700">
+          <td class="pt-3">Total Seluruh Golongan</td>
+          <td class="pt-3 text-center font-mono">${totalGlobalAll.toLocaleString('id-ID')} Kr</td>
+          <td class="pt-3 text-center font-mono text-slate-400">${totalAvgGlobal.toLocaleString('id-ID')} Kr</td>
+          <td class="pt-3 text-center text-emerald-400 font-mono">100.00%</td>
+        </tr>
+      `;
+    }
+
+    // 6. Fungsi Form Helper
+    window.editData = function(docId) {
+      const item = dataLHR.find(d => d.docId === docId);
+      if (!item) return;
+
+      document.getElementById('editId').value = item.docId;
+      document.getElementById('inputPeriode').value = item.periode;
+      document.getElementById('inputHari').value = item.hari;
+      document.getElementById('inputGol1').value = item.gol1;
+      document.getElementById('inputGol2').value = item.gol2;
+      document.getElementById('inputGol3').value = item.gol3;
+      document.getElementById('inputGol4').value = item.gol4;
+      document.getElementById('inputGol5').value = item.gol5;
+
+      document.getElementById('formTitle').innerHTML = '<span>✏️</span> Edit Data VLL/LHR Periode';
+      document.getElementById('btnSubmit').innerText = 'Update Data VLL/LHR di Cloud';
+      document.getElementById('btnSubmit').className = 'w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 text-sm rounded-lg transition-colors shadow';
+      document.getElementById('btnBatalEdit').classList.remove('hidden');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.batalEdit = function() {
+      document.getElementById('editId').value = '';
+      document.getElementById('lhrForm').reset();
+      document.getElementById('inputGol1').value = 0;
+      document.getElementById('inputGol2').value = 0;
+      document.getElementById('inputGol3').value = 0;
+      document.getElementById('inputGol4').value = 0;
+      document.getElementById('inputGol5').value = 0;
+
+      document.getElementById('formTitle').innerHTML = '<span>➕</span> Tambah Entry Data VLL/LHR';
+      document.getElementById('btnSubmit').innerText = 'Simpan Data VLL/LHR ke Cloud';
+      document.getElementById('btnSubmit').className = 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 text-sm rounded-lg transition-colors shadow';
+      document.getElementById('btnBatalEdit').classList.add('hidden');
+    };
+
+    function formatPeriode(str) {
+      if (!str) return '-';
+      const [year, month] = str.split('-');
+      const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      return `${namaBulan[parseInt(month) - 1]} ${year}`;
+    }
+
+    // 7. Ekspor ke Excel
+    window.eksporExcel = function() {
+      if (dataLHR.length === 0) {
+        alert("Tidak ada data untuk diekspor!");
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+      const excelData = dataLHR.map(d => {
+        const total = d.gol1 + d.gol2 + d.gol3 + d.gol4 + d.gol5;
+        return {
+          "Periode": formatPeriode(d.periode),
+          "Jumlah Hari": d.hari,
+          "Golongan I": d.gol1,
+          "Golongan II": d.gol2,
+          "Golongan III": d.gol3,
+          "Golongan IV": d.gol4,
+          "Golongan V": d.gol5,
+          "Total VLL": total,
+          "LHR": Math.round(total / d.hari)
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      XLSX.utils.book_append_sheet(wb, ws, "Rekap LHR Cloud");
+      XLSX.writeFile(wb, "Monitoring_LHR_Per_Golongan.xlsx");
+    };
+
+    // Muat data saat halaman dibuka
+    loadDataFromCloud();
+  </script>
+</body>
+</html>
