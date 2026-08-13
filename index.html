@@ -109,10 +109,10 @@
             </tr>
           </thead>
           <tbody id="tbodyRiwayat" class="divide-y divide-slate-200 bg-white">
-            <!-- Data dari Cloud diisi otomatis oleh JS -->
+            <!-- Data diisi otomatis dari Firebase -->
           </tbody>
           <tfoot id="tfootRiwayat" class="bg-slate-200 text-slate-800 font-bold border-t-2 border-slate-400">
-            <!-- Total diisi otomatis oleh JS -->
+            <!-- Total diisi otomatis -->
           </tfoot>
         </table>
       </div>
@@ -132,7 +132,7 @@
             </tr>
           </thead>
           <tbody id="tbodyStatistik" class="divide-y divide-slate-800 text-slate-200">
-            <!-- Data statistik diisi otomatis oleh JS -->
+            <!-- Data statistik diisi otomatis -->
           </tbody>
           <tfoot id="tfootStatistik" class="border-t border-slate-700 font-bold text-white">
           </tfoot>
@@ -155,15 +155,14 @@
       deleteDoc 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // KONEKSI FIREBASE (Ganti nilai berikut dengan Kunci API Firebase Anda)
+    // PASTE KODE FIREBASE CONFIG ANDA DI SINI
     const firebaseConfig = {
-      apiKey: "AIzaSyCWr4wsORe_eKWt-4AEnnHai9F-JzjMc7U",
-      authDomain: "m-e-ops.firebaseapp.com",
-      databaseURL: "https://m-e-ops-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "m-e-ops",
-      storageBucket: "m-e-ops.firebasestorage.app",
-      messagingSenderId: "775606736462",
-      appId: "1:775606736462:web:9165314ab2a5f182d9151f"
+      apiKey: "PASTE_API_KEY_ANDA_DI_SINI",
+      authDomain: "PASTE_PROJECT_ID.firebaseapp.com",
+      projectId: "PASTE_PROJECT_ID",
+      storageBucket: "PASTE_PROJECT_ID.appspot.com",
+      messagingSenderId: "PASTE_SENDER_ID",
+      appId: "PASTE_APP_ID"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -172,7 +171,7 @@
 
     let dataLHR = [];
 
-    // 1. Ambil Data dari Firebase Firestore
+    // Load Data dari Firestore Cloud
     async function loadDataFromCloud() {
       try {
         const querySnapshot = await getDocs(lhrCollection);
@@ -186,11 +185,11 @@
         render();
       } catch (error) {
         console.error("Gagal mengambil data dari cloud:", error);
-        alert("Gagal memuat data dari database cloud!");
+        alert("Gagal memuat data dari database cloud. Pastikan Firebase Config dan Rules sudah benar.");
       }
     }
 
-    // 2. Simpan / Edit Data ke Firebase Firestore
+    // Simpan / Update Data
     window.simpanData = async function(e) {
       e.preventDefault();
       const editId = document.getElementById('editId').value;
@@ -211,7 +210,7 @@
         } else {
           await addDoc(lhrCollection, payload);
         }
-        batalEdit();
+        window.batalEdit();
         await loadDataFromCloud();
       } catch (error) {
         console.error("Gagal menyimpan data:", error);
@@ -219,12 +218,12 @@
       }
     };
 
-    // 3. Hapus Data dari Firebase Firestore
+    // Hapus Data
     window.hapusData = async function(docId) {
       if (confirm('Yakin ingin menghapus data LHR periode ini dari database cloud?')) {
         try {
           await deleteDoc(doc(db, "dataLHR", docId));
-          batalEdit();
+          window.batalEdit();
           await loadDataFromCloud();
         } catch (error) {
           console.error("Gagal menghapus data:", error);
@@ -233,14 +232,14 @@
       }
     };
 
-    // 4. Render Tabel Utama
+    // Render Tabel
     function render() {
       const tbodyRiwayat = document.getElementById('tbodyRiwayat');
       const tfootRiwayat = document.getElementById('tfootRiwayat');
       tbodyRiwayat.innerHTML = '';
 
       if (dataLHR.length === 0) {
-        tbodyRiwayat.innerHTML = `<tr><td colspan="15" class="p-4 text-center text-slate-400">Belum ada data tersimpan di online database.</td></tr>`;
+        tbodyRiwayat.innerHTML = `<tr><td colspan="15" class="p-4 text-center text-slate-400">Belum ada data tersimpan di cloud database.</td></tr>`;
         tfootRiwayat.innerHTML = '';
         renderStatistik(0, 0, 0, 0, 0, 0);
         return;
@@ -309,7 +308,7 @@
       renderStatistik(totalGlobalGol1, totalGlobalGol2, totalGlobalGol3, totalGlobalGol4, totalGlobalGol5, totalGlobalHari);
     }
 
-    // 5. Render Tabel Statistik Kumulatif
+    // Render Statistik
     function renderStatistik(g1, g2, g3, g4, g5, totalHari) {
       const totalGlobalAll = g1 + g2 + g3 + g4 + g5;
       const golArr = [
@@ -350,7 +349,7 @@
       `;
     }
 
-    // 6. Fungsi Form Helper
+    // Form Helper Functions
     window.editData = function(docId) {
       const item = dataLHR.find(d => d.docId === docId);
       if (!item) return;
@@ -394,7 +393,7 @@
       return `${namaBulan[parseInt(month) - 1]} ${year}`;
     }
 
-    // 7. Ekspor ke Excel
+    // Ekspor Excel
     window.eksporExcel = function() {
       if (dataLHR.length === 0) {
         alert("Tidak ada data untuk diekspor!");
@@ -420,7 +419,6 @@
       XLSX.writeFile(wb, "Monitoring_LHR_Per_Golongan.xlsx");
     };
 
-    // Muat data saat halaman dibuka
     loadDataFromCloud();
   </script>
 </body>
